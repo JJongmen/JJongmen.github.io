@@ -8,10 +8,12 @@
 
 이 저장소는 같은 학교에 재학중인 친구들과 함께한 팀인 '김택윤남현기박종윤이준혁' 의 오픈소스 프로젝트가 게시됩니다.
 
-팀 구성원들의 github 주소입니다.
+저희 팀 구성원들의 페이지에서도 이 프로젝트 관련 정보를 얻을 수 있습니다.
 
 김택윤(GoodTY) : https://github.com/GoodTY/GoodTY.github.io
 
 남현기(namHG) : https://github.com/namHG/namHG.github.io
 
 이준혁(bnbong) : https://github.com/bnbong/bnbong.github.io
+
+읽어주셔서 감사합니다.
