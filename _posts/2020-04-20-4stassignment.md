@@ -6,7 +6,7 @@ date: 2020-04-20 18:51:00 -0400
 
 다음과 같은 프로젝트들에 참여한 적 있습니다.
 
-무한소수계산기 : https://github.com/JJongmen/InfCal
+무한소수계산기 : https://github.com/JJongmen/InfCal(https://github.com/JJongmen/InfCal)
 
 음식선택앱 : https://github.com/bnbong/ERICA_FoodDecisionMaker
 
