@@ -8,6 +8,7 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.IBinder;
+import android.os.RemoteException;
 import android.text.format.Time;
 import android.util.Log;
 
@@ -21,9 +22,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import com.example.weatherapp.IFetchDataListener;
+import com.example.weatherapp.IFetchWeatherService;
 
 public class FetchWeatherService extends Service {
     public static final String ACTION_RETRIEVE_WEATHER_DATA = "com.example.weatherapp.RETRIEVE_DATA";
@@ -45,18 +50,11 @@ public class FetchWeatherService extends Service {
         return super.onStartCommand(intent, flags, startId);
     }
 
-    private void retrieveWeatherData(int startId) {
-        FetchWeatherTask weatherTask = new FetchWeatherTask(startId);
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        String cityId = prefs.getString("city", "37.5683,126.9778");
-        String[] cityLocation = cityId.split(",");
-        weatherTask.execute(cityLocation);
-    }
+
 
     @Override
     public IBinder onBind(Intent intent) {
-        // TODO: Return the communication channel to the service.
-        throw new UnsupportedOperationException("Not yet implemented");
+        return new FetchWeatherServiceProxy(this);
     }
 
     public class FetchWeatherTask extends AsyncTask<String[], Void, String[][]> {
@@ -327,6 +325,18 @@ public class FetchWeatherService extends Service {
             result_night[i] = day[4];
             i += 1;
         }
+        synchronized (mListeners) {
+            for (IFetchDataListener listener : mListeners) {
+                try {
+
+                    listener.onWeatherDataRetrieved(result_main);
+                } catch (RemoteException ex) {
+                    ex.printStackTrace();
+                }
+            }
+
+
+        }
         intent.putExtra(EXTRA_WEATHER_DATA, result_main);
         intent.putExtra(EXTRA_DESCRIPTION_DATA, result_description);
         intent.putExtra(EXTRA_MORNING_DATA , result_morning);
@@ -335,4 +345,56 @@ public class FetchWeatherService extends Service {
 //        intent.putExtra(EXTRA_WEATHER_DATA, result[0]);
         sendBroadcast(intent);
     }
+
+    private void retrieveWeatherData(int startId) {
+        FetchWeatherTask weatherTask = new FetchWeatherTask(startId);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String cityId = prefs.getString("city", "37.5683,126.9778");
+        String[] cityLocation = cityId.split(",");
+        weatherTask.execute(cityLocation);
+    }
+
+    private ArrayList<IFetchDataListener> mListeners = new ArrayList<IFetchDataListener>();
+    private void registerFetchDataListener(IFetchDataListener listener) {
+        synchronized (mListeners) {
+            if (mListeners.contains(listener)) {
+                return;
+            }
+            mListeners.add(listener);
+        }
+    }
+
+    private void unregisterFetchDataListener(IFetchDataListener listener) {
+        synchronized (mListeners) {
+            if (!mListeners.contains(listener)) {
+                return;
+            }
+
+            mListeners.remove(listener);
+        }
+    }
+
+    private class FetchWeatherServiceProxy extends IFetchWeatherService.Stub {
+        private WeakReference<FetchWeatherService> mService = null;
+
+        public FetchWeatherServiceProxy(FetchWeatherService service) {
+            mService = new WeakReference<FetchWeatherService>(service);
+        }
+
+        @Override
+        public void retrieveWeatherDataRetrieve() throws RemoteException {
+            mService.get().retrieveWeatherData(-1);
+        }
+
+        @Override
+        public void registerFetchDataListener(IFetchDataListener listener) throws RemoteException {
+            mService.get().registerFetchDataListener(listener);
+        }
+
+        @Override
+        public void unregisterFetchDataListener(IFetchDataListener listener) throws RemoteException {
+            mService.get().unregisterFetchDataListener(listener);
+        }
+    }
 }
+
