@@ -2,6 +2,7 @@ package com.example.weatherapp;
 
 import android.app.IntentService;
 import android.app.Service;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -27,6 +28,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Vector;
+
+import com.example.weatherapp.IFetchDataListener;
+import com.example.weatherapp.IFetchWeatherService;
 
 public class FetchWeatherService extends Service {
     public static final String ACTION_RETRIEVE_WEATHER_DATA = "com.example.weatherapp.RETRIEVE_DATA";
@@ -48,22 +53,14 @@ public class FetchWeatherService extends Service {
         return super.onStartCommand(intent, flags, startId);
     }
 
-    private void retrieveWeatherData(int startId) {
-        FetchWeatherTask weatherTask = new FetchWeatherTask(startId);
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        String cityId = prefs.getString("city", "37.5683,126.9778");
-        String[] cityLocation = cityId.split(",");
-        weatherTask.execute(cityLocation);
-    }
+
 
     @Override
     public IBinder onBind(Intent intent) {
-        // TODO: Return the communication channel to the service.
-//        throw new UnsupportedOperationException("Not yet implemented");
         return new FetchWeatherServiceProxy(this);
     }
 
-    public class FetchWeatherTask extends AsyncTask<String[], Void, String[][]> {
+    public class FetchWeatherTask extends AsyncTask<String[], Void, Void> {
 
         private final String LOG_TAG = FetchWeatherTask.class.getSimpleName();
         private int mStartId = -1;
@@ -73,36 +70,15 @@ public class FetchWeatherService extends Service {
             mStartId = startId;
         }
 
-        /* The date/time conversion code is going to be moved outside the asynctask later,
-         * so for convenience we're breaking it out into its own method now.
-         */
-        private String getReadableDateString(long time){
-            // Because the API returns a unix timestamp (measured in seconds),
-            // it must be converted to milliseconds in order to be converted to valid date.
-            SimpleDateFormat shortenedDateFormat = new SimpleDateFormat("EEE MMM dd");
-            return shortenedDateFormat.format(time);
-        }
-
-        /**
-         * Prepare the weather high/lows for presentation.
-         */
-        private String formatHighLows(double high, double low) {
-            // For presentation, assume the user doesn't care about tenths of a degree.
-            long roundedHigh = Math.round(high);
-            long roundedLow = Math.round(low);
-
-            String highLowStr = roundedHigh + "/" + roundedLow;
-            return highLowStr;
-        }
 
         /**
          * Take the String representing the complete forecast in JSON Format and
          * pull out the data we need to construct the Strings needed for the wireframes.
-         *
+         * <p>
          * Fortunately parsing is easy:  constructor takes the JSON string and converts it
          * into an Object hierarchy for us.
          */
-        private String[][] getWeatherDataFromJson(String forecastJsonStr, int numDays)
+        private void getWeatherDataFromJson(String forecastJsonStr, int numDays)
                 throws JSONException {
 
             // These are the names of the JSON objects that need to be extracted.
@@ -119,6 +95,9 @@ public class FetchWeatherService extends Service {
 
             JSONObject forecastJson = new JSONObject(forecastJsonStr);
             JSONArray weatherArray = forecastJson.getJSONArray(OWM_DAILY);
+
+            // Insert the new weather information into the database
+            Vector<ContentValues> cVVector = new Vector<ContentValues>(weatherArray.length());
 
             // OWM returns daily forecasts based upon the local time of the city that is being
             // asked for, which means that we need to know the GMT offset to translate this data
@@ -137,8 +116,8 @@ public class FetchWeatherService extends Service {
             // now we work exclusively in UTC
             dayTime = new Time();
 
-            String[][] resultStrs = new String[numDays][5];
-            for(int i = 0; i < weatherArray.length(); i++) {
+            String[][] resultStrs = new String[numDays][8];
+            for (int i = 0; i < weatherArray.length(); i++) {
                 // For now, using the format "Day, description, hi/low"
                 String day;
                 String main;
@@ -156,8 +135,7 @@ public class FetchWeatherService extends Service {
                 // "this saturday".
                 long dateTime;
                 // Cheating to convert this to UTC time, which is what we want anyhow
-                dateTime = dayTime.setJulianDay(julianStartDay+i);
-                day = getReadableDateString(dateTime);
+                dateTime = dayTime.setJulianDay(julianStartDay + i);
 
                 // description is in a child array called "weather", which is 1 element long.
                 JSONObject weatherObject = dayForecast.getJSONArray(OWM_WEATHER).getJSONObject(0);
@@ -173,23 +151,43 @@ public class FetchWeatherService extends Service {
                 double evening = Math.round(temperatureObject.getDouble(OWM_EVENING) - 273.15);
                 double night = Math.round(temperatureObject.getDouble(OWM_NIGHT) - 273.15);
 
-                highAndLow = formatHighLows(high, low);
-                resultStrs[i][0] = day + " - " + main + " - " + highAndLow;
-                resultStrs[i][1] = "Description Weather : " + description;
-                resultStrs[i][2] = "Morning Temperature : " + (int)morning;
-                resultStrs[i][3] = "Evening Temperature : " + (int)evening;
-                resultStrs[i][4] = "Night Temperature : " + (int)night;
+//                highAndLow = formatHighLows(high, low);
+//                resultStrs[i][0] = day + " - " + main + " - " + highAndLow;
+//                resultStrs[i][1] = "Description Weather : " + description;
+//                resultStrs[i][2] = "Morning Temperature : " + (int)morning;
+//                resultStrs[i][3] = "Evening Temperature : " + (int)evening;
+//                resultStrs[i][4] = "Night Temperature : " + (int)night;
+                ContentValues values = new ContentValues();
+                values.put(WeatherContract.WeatherColumns.COLUMN_DATE, dateTime);
+                values.put(WeatherContract.WeatherColumns.COLUMN_SHORT_DESC, main);
+                values.put(WeatherContract.WeatherColumns.COLUMN_MIN_TEMP, low);
+                values.put(WeatherContract.WeatherColumns.COLUMN_MAX_TEMP, high);
+                values.put(WeatherContract.WeatherColumns.COLUMN_LONG_DESC, description);
+                values.put(WeatherContract.WeatherColumns.COLUMN_MORNING_TEMP, morning);
+                values.put(WeatherContract.WeatherColumns.COLUMN_EVENING_TEMP, evening);
+                values.put(WeatherContract.WeatherColumns.COLUMN_NIGHT_TEMP, night);
+                cVVector.add(values);
             }
 
-            for (String s : resultStrs[0]) {
-                Log.v(LOG_TAG, "Forecast entry: " + s);
-            }
-            return resultStrs;
 
+
+            // add to database
+            if (cVVector.size() > 0) {
+                Log.d("AAAAAA", "OH YEA");
+                ContentValues[] cvArray = new ContentValues[cVVector.size()];
+                cVVector.toArray(cvArray);
+                getContentResolver().bulkInsert(WeatherContract.WeatherColumns.CONTENT_URI, cvArray);
+
+                // delete old data so we don't build up an endless history
+                getContentResolver().delete(WeatherContract.WeatherColumns.CONTENT_URI,
+                        WeatherContract.WeatherColumns.COLUMN_DATE + " <= ?",
+                        new String[]{Long.toString(dayTime.setJulianDay(julianStartDay - 1))});
+                Log.d("AAAAAA", "OH YEA");
+            }
         }
 
         @Override
-        protected String[][] doInBackground(String[]... params) {
+        protected Void doInBackground(String[]... params) {
 
             // If there's no zip code, there's nothing to look up.  Verify size of params.
             if (params.length == 0) {
@@ -293,10 +291,9 @@ public class FetchWeatherService extends Service {
             }
 
             try {
-                return getWeatherDataFromJson(forecastJsonStr, numDays);
-            } catch (JSONException e) {
-                Log.e(LOG_TAG, e.getMessage(), e);
-                e.printStackTrace();
+                getWeatherDataFromJson(forecastJsonStr, numDays);
+            } catch (JSONException ex) {
+                ex.printStackTrace();
             }
 
             // This will only happen if there was an error getting or parsing the forecast.
@@ -304,14 +301,9 @@ public class FetchWeatherService extends Service {
         }
 
         @Override
-        protected void onPostExecute(String[][] result) {
-            if (result != null) {
-
-                notifyWeatherDataRetrieved(result);
-
-            }
-
-            stopSelf(mStartId);
+        protected void onPostExecute(Void aVoid) {
+            if (mStartId < 0)
+                return;
         }
     }
 
@@ -331,6 +323,18 @@ public class FetchWeatherService extends Service {
             result_night[i] = day[4];
             i += 1;
         }
+        synchronized (mListeners) {
+            for (IFetchDataListener listener : mListeners) {
+                try {
+
+                    listener.onWeatherDataRetrieved(result_main);
+                } catch (RemoteException ex) {
+                    ex.printStackTrace();
+                }
+            }
+
+
+        }
         intent.putExtra(EXTRA_WEATHER_DATA, result_main);
         intent.putExtra(EXTRA_DESCRIPTION_DATA, result_description);
         intent.putExtra(EXTRA_MORNING_DATA , result_morning);
@@ -338,6 +342,14 @@ public class FetchWeatherService extends Service {
         intent.putExtra(EXTRA_NIGHT_DATA , result_night);
 //        intent.putExtra(EXTRA_WEATHER_DATA, result[0]);
         sendBroadcast(intent);
+    }
+
+    private void retrieveWeatherData(int startId) {
+        FetchWeatherTask weatherTask = new FetchWeatherTask(startId);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String cityId = prefs.getString("city", "37.5683,126.9778");
+        String[] cityLocation = cityId.split(",");
+        weatherTask.execute(cityLocation);
     }
 
     private ArrayList<IFetchDataListener> mListeners = new ArrayList<IFetchDataListener>();
@@ -368,7 +380,7 @@ public class FetchWeatherService extends Service {
         }
 
         @Override
-        public void retrieveWeatherData() throws RemoteException {
+        public void retrieveWeatherDataRetrieve() throws RemoteException {
             mService.get().retrieveWeatherData(-1);
         }
 
@@ -382,5 +394,5 @@ public class FetchWeatherService extends Service {
             mService.get().unregisterFetchDataListener(listener);
         }
     }
-
 }
+

@@ -9,5 +9,6 @@
         android:id="@+id/list_item_forecast_textview"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center" />
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.AppCompat.Display1" />
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -12,10 +12,16 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
+        <provider
+            android:name=".WeatherProvider"
+            android:authorities="com.example.weatherapp"
+            android:enabled="true"
+            android:exported="true"></provider>
+
         <service
             android:name=".FetchWeatherService"
             android:enabled="true"
-            android:exported="true"></service>
+            android:exported="true" />
 
         <activity
             android:name=".SettingsActivity"
