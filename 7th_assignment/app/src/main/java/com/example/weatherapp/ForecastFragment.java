@@ -1,11 +1,9 @@
 package com.example.weatherapp;
 
 import android.content.BroadcastReceiver;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -15,8 +13,6 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
-import android.os.IBinder;
-import android.os.RemoteException;
 import android.text.format.Time;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -56,7 +52,6 @@ public class ForecastFragment extends Fragment {
 
     private ArrayAdapter<String> adapter;
     private ArrayAdapter<String> detail_adapter;
-    private IFetchWeatherService mService;
 
     private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -69,9 +64,9 @@ public class ForecastFragment extends Fragment {
                 String[] data3 = intent.getStringArrayExtra(FetchWeatherService.EXTRA_EVENING_DATA);
                 String[] data4 = intent.getStringArrayExtra(FetchWeatherService.EXTRA_NIGHT_DATA);
                 adapter.clear();
-//                for(String dayForecastStr : data) {
-//                    adapter.add(dayForecastStr);
-//                }
+                for(String dayForecastStr : data) {
+                    adapter.add(dayForecastStr);
+                }
                 detail_adapter.clear();
                 for(int i = 0; i < 8; i++) {
                     String detailFormat = new String(data1[i] + '\n' + data2[i] + '\n' + data3[i] + '\n' + data4[i] );
@@ -80,53 +75,6 @@ public class ForecastFragment extends Fragment {
             }
         }
     };
-
-    private ServiceConnection mServiceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            mService = IFetchWeatherService.Stub.asInterface(service);
-
-            try {
-                mService.registerFetchDataListener(mFetchDataListener);
-            } catch (RemoteException ex) {
-                ex.printStackTrace();
-            }
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            mService = null;
-        }
-    };
-
-    private IFetchDataListener.Stub mFetchDataListener = new IFetchDataListener.Stub() {
-        @Override
-        public void onWeatherDataRetrieved(String[] data) throws RemoteException {
-//            String[] result_main = new String[8];
-//            String[] result_description = new String[8];
-//            String[] result_morning = new String[8];
-//            String[] result_evening = new String[8];
-//            String[] result_night = new String[8];
-//            int i = 0;
-//            for(String[] day : data) {
-//                result_main[i] = day[0];
-//                result_description[i] = day[1];
-//                result_morning[i] = day[2];
-//                result_evening[i] = day[3];
-//                result_night[i] = day[4];
-//                i += 1;
-//            }
-            adapter.clear();
-            for(String dayForecastStr : data) {
-                adapter.add(dayForecastStr);
-            }
-//            detail_adapter.clear();
-//            for(int k = 0; k < 8; k++) {
-//                String detailFormat = new String(result_description[k] + '\n' + result_morning[k] + '\n' + result_evening[k] + '\n' + result_night[k] );
-//                detail_adapter.add(detailFormat);
-//            }
-        }
-    } ;
 
     public ForecastFragment() {
         // Required empty public constructor
@@ -141,20 +89,6 @@ public class ForecastFragment extends Fragment {
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         inflater.inflate(R.menu.main_menu, menu);
-        getActivity().bindService(new Intent(getActivity(), FetchWeatherService.class), mServiceConnection, Context.BIND_AUTO_CREATE);
-    }
-
-    @Override
-    public void onDestroy() {
-        if (mService != null) {
-            try {
-                mService.unregisterFetchDataListener(mFetchDataListener);
-            } catch (RemoteException ex) {
-                ex.printStackTrace();
-            }
-        }
-        getActivity().unbindService(mServiceConnection);
-        super.onDestroy();
     }
 
     @Override
@@ -173,16 +107,9 @@ public class ForecastFragment extends Fragment {
     }
 
     private void refreshWeatherData() {
-//        Intent intent = new Intent(getActivity(), FetchWeatherService.class);
-//        intent.setAction(FetchWeatherService.ACTION_RETRIEVE_WEATHER_DATA);
-//        getActivity().startService(intent);
-        if (mService != null) {
-            try {
-                mService.retrieveWeatherDataRetrieve();
-            } catch (RemoteException ex) {
-                ex.printStackTrace();
-            }
-        }
+        Intent intent = new Intent(getActivity(), FetchWeatherService.class);
+        intent.setAction(FetchWeatherService.ACTION_RETRIEVE_WEATHER_DATA);
+        getActivity().startService(intent);
     }
 
     @Override
@@ -219,22 +146,22 @@ public class ForecastFragment extends Fragment {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
                 String forecast = adapter.getItem(position);
-//                String detailForecast = detail_adapter.getItem(position);
+                String detailForecast = detail_adapter.getItem(position);
                 Toast.makeText(getActivity(), forecast, Toast.LENGTH_SHORT).show();
                 Intent intent = new Intent(getActivity(), DetailActivity.class);
-//                intent.putExtra("data", detailForecast);
+                intent.putExtra("data", detailForecast);
                 startActivity(intent);
             }
         });
         refreshWeatherData();
-//        IntentFilter intentFilter = new IntentFilter(FetchWeatherService.ACTION_RETRIEVE_WEATHER_DATA);
-//        getActivity().registerReceiver(mBroadcastReceiver, intentFilter);
+        IntentFilter intentFilter = new IntentFilter(FetchWeatherService.ACTION_RETRIEVE_WEATHER_DATA);
+        getActivity().registerReceiver(mBroadcastReceiver, intentFilter);
         return view;
     }
 
     @Override
     public void onDestroyView() {
-//        getActivity().unregisterReceiver(mBroadcastReceiver);
+        getActivity().unregisterReceiver(mBroadcastReceiver);
         super.onDestroyView();
     }
 }

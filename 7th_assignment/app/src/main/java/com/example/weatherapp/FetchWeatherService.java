@@ -27,8 +27,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import com.example.weatherapp.IFetchDataListener;
-import com.example.weatherapp.IFetchWeatherService;
 
 public class FetchWeatherService extends Service {
     public static final String ACTION_RETRIEVE_WEATHER_DATA = "com.example.weatherapp.RETRIEVE_DATA";
@@ -50,10 +48,18 @@ public class FetchWeatherService extends Service {
         return super.onStartCommand(intent, flags, startId);
     }
 
-
+    private void retrieveWeatherData(int startId) {
+        FetchWeatherTask weatherTask = new FetchWeatherTask(startId);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String cityId = prefs.getString("city", "37.5683,126.9778");
+        String[] cityLocation = cityId.split(",");
+        weatherTask.execute(cityLocation);
+    }
 
     @Override
     public IBinder onBind(Intent intent) {
+        // TODO: Return the communication channel to the service.
+//        throw new UnsupportedOperationException("Not yet implemented");
         return new FetchWeatherServiceProxy(this);
     }
 
@@ -325,18 +331,6 @@ public class FetchWeatherService extends Service {
             result_night[i] = day[4];
             i += 1;
         }
-        synchronized (mListeners) {
-            for (IFetchDataListener listener : mListeners) {
-                try {
-
-                    listener.onWeatherDataRetrieved(result_main);
-                } catch (RemoteException ex) {
-                    ex.printStackTrace();
-                }
-            }
-
-
-        }
         intent.putExtra(EXTRA_WEATHER_DATA, result_main);
         intent.putExtra(EXTRA_DESCRIPTION_DATA, result_description);
         intent.putExtra(EXTRA_MORNING_DATA , result_morning);
@@ -344,14 +338,6 @@ public class FetchWeatherService extends Service {
         intent.putExtra(EXTRA_NIGHT_DATA , result_night);
 //        intent.putExtra(EXTRA_WEATHER_DATA, result[0]);
         sendBroadcast(intent);
-    }
-
-    private void retrieveWeatherData(int startId) {
-        FetchWeatherTask weatherTask = new FetchWeatherTask(startId);
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        String cityId = prefs.getString("city", "37.5683,126.9778");
-        String[] cityLocation = cityId.split(",");
-        weatherTask.execute(cityLocation);
     }
 
     private ArrayList<IFetchDataListener> mListeners = new ArrayList<IFetchDataListener>();
@@ -382,7 +368,7 @@ public class FetchWeatherService extends Service {
         }
 
         @Override
-        public void retrieveWeatherDataRetrieve() throws RemoteException {
+        public void retrieveWeatherData() throws RemoteException {
             mService.get().retrieveWeatherData(-1);
         }
 
@@ -396,5 +382,5 @@ public class FetchWeatherService extends Service {
             mService.get().unregisterFetchDataListener(listener);
         }
     }
-}
 
+}

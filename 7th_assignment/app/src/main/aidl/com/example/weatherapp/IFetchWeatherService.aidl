@@ -9,7 +9,7 @@ interface IFetchWeatherService {
      * Demonstrates some basic types that you can use as parameters
      * and return values in AIDL.
      */
-    void retrieveWeatherDataRetrieve();
+    void retrieveWeatherData();
     void registerFetchDataListener(IFetchDataListener listener);
     void unregisterFetchDataListener(IFetchDataListener listener);
 }
